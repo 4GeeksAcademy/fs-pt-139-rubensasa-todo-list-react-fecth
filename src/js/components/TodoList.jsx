@@ -1,26 +1,85 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import TodoItem from "./TodoItem";
+
+const USERNAME = "rubensasa";
+const API_BASE = "https://playground.4geeks.com/todo";
 
 const TodoList = () => {
 
   const [tomaDatos, setTomaDatos] = useState("");
+  const [tarea, setTarea] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
-  const [tarea, setTarea] = useState([
-    "Make the bed",
-    "Wash my hands",
-    "Eat",
-    "Walk the dog",
-  ]);
+  const createUser = () => {
+    fetch(`${API_BASE}/users/${USERNAME}`, {
+      method: "POST",
+      body: JSON.stringify([]),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+      .then((resp) => resp.json())
+      .then(() => {
+        setTarea([]);
+        setCargando(false);
+      })
+      .catch((error) => console.log(error));
+  };
+
+  const getTasks = () => {
+    fetch(`${API_BASE}/users/${USERNAME}`)
+      .then((resp) => {
+        if (resp.status === 404) {
+          createUser();
+          return null;
+        }
+        return resp.json();
+      })
+      .then((data) => {
+        if (data) {
+          setTarea(data.todos);
+          setCargando(false);
+        }
+      })
+      .catch((error) => console.log(error));
+  };
+
+useEffect(() => {getTasks();}, []);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && tomaDatos.trim() !== "") {
-      setTarea([...tarea, tomaDatos.trim()]);
-      setTomaDatos("");
+      const nuevaTarea = { label: tomaDatos.trim(), is_done: false };
+
+      fetch(`${API_BASE}/todos/${USERNAME}`, {
+        method: "POST",
+        body: JSON.stringify(nuevaTarea),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+        .then((resp) => resp.json())
+        .then(() => {
+          getTasks();
+          setTomaDatos("");
+        })
+        .catch((error) => console.log(error));
     }
   };
 
-  const deleteTask = (indexToDelete) => {
-    setTarea(tarea.filter((_, index) => index !== indexToDelete));
+  const deleteTask = (todoId) => {
+    fetch(`${API_BASE}/todos/${todoId}`, {
+      method: "DELETE",
+    })
+      .then(() => getTasks())
+      .catch((error) => console.log(error));
+  };
+
+  const clearAllTasks = () => {
+    fetch(`${API_BASE}/users/${USERNAME}`, {
+      method: "DELETE",
+    })
+      .then(() => createUser())
+      .catch((error) => console.log(error));
   };
 
   return (
@@ -51,23 +110,33 @@ const TodoList = () => {
 
 
         <ul className="list-group list-group-flush">
-          {tarea.length === 0 ? (
+          {cargando ? (
+            <li className="list-group-item py-3 ps-4 text-muted fst-italic fs-5 fw-light">
+              Cargando tareas...
+            </li>
+          ) : tarea.length === 0 ? (
             <li className="list-group-item py-3 ps-4 text-muted fst-italic fs-5 fw-light">
               Acabaste las tareas, añadir nuevas tareas
             </li>
           ) : (
-            tarea.map((task, index) => (
+            tarea.map((task) => (
               <TodoItem
-                key={index}
-                task={task}
-                onDelete={() => deleteTask(index)}
+                key={task.id}
+                task={task.label}
+                onDelete={() => deleteTask(task.id)}
               />
             ))
           )}
         </ul>
         
-        <div className="card-footer bg-white text-muted py-2 ps-3 border-top-0 fs-6 fw-light shadow-sm">
-          {tarea.length} {tarea.length === 1 ? "item" : "items"} left
+        <div className="card-footer bg-white text-muted py-2 ps-3 border-top-0 fs-6 fw-light shadow-sm d-flex justify-content-between align-items-center">
+          <span>{tarea.length} {tarea.length === 1 ? "item" : "items"} left</span>
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={clearAllTasks}
+          >
+            Limpiar todo
+          </button>
         </div>
       </div>
 
